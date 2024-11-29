@@ -61,11 +61,10 @@ class Window(Gtk.Window):
         vpaned.pack1(put_in_frame(self.da), True, True)
 
     def da_draw_event(self, _, cr):
-
-        hint_height = 40
+        hint_height = 20
 
         cr.select_font_face("Sans", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)
-        cr.set_font_size(20)
+        cr.set_font_size(14)
 
         for hint_value, pos in self.hints.items():
             x_loc, y_loc = pos
@@ -93,30 +92,35 @@ class Window(Gtk.Window):
                 cr.restore()
 
     def on_key_press(self, _, event):
-        keymap = Gdk.Keymap.get_default()
+        #
+        # keymap = Gdk.Keymap.get_default()
+        #
+        # # Instead of using event.keyval, we do it the lowlevel way.
+        # # Reason: ignoring CAPSLOCK and checking if SHIFT was pressed
+        # state = Gdk.ModifierType(event.state & ~Gdk.ModifierType.LOCK_MASK)
+        # res = keymap.translate_keyboard_state(
+        #     event.hardware_keycode,
+        #     state,
+        #     # https://github.com/mypaint/mypaint/issues/974
+        #     # event.group)
+        #     1,
+        # )
+        #
+        # keyval = res[1]
+        # consumed_modifiers = res[4]
+        #
+        # # We want to ignore irrelevant modifiers like ScrollLock.  The stored
+        # # key binding does not include modifiers that affected its keyval.
+        # modifiers = (
+        #     event.state & Gtk.accelerator_get_default_mod_mask() & ~consumed_modifiers
+        # )
+        #
+        # # Except that key bindings are always stored in lowercase.
+        # keyval_lower = Gdk.keyval_to_lower(keyval)
 
-        # Instead of using event.keyval, we do it the lowlevel way.
-        # Reason: ignoring CAPSLOCK and checking if SHIFT was pressed
-        state = Gdk.ModifierType(event.state & ~Gdk.ModifierType.LOCK_MASK)
-        res = keymap.translate_keyboard_state(
-            event.hardware_keycode,
-            state,
-            # https://github.com/mypaint/mypaint/issues/974
-            # event.group)
-            1,
+        keyval, keyval_lower, accel_label, modifiers = translate(
+            event.hardware_keycode, event.state, event.group
         )
-
-        keyval = res[1]
-        consumed_modifiers = res[4]
-
-        # We want to ignore irrelevant modifiers like ScrollLock.  The stored
-        # key binding does not include modifiers that affected its keyval.
-        modifiers = (
-            event.state & Gtk.accelerator_get_default_mod_mask() & ~consumed_modifiers
-        )
-
-        # Except that key bindings are always stored in lowercase.
-        keyval_lower = Gdk.keyval_to_lower(keyval)
 
         if keyval_lower != keyval:
             modifiers |= Gdk.ModifierType.SHIFT_MASK
@@ -163,3 +167,63 @@ if __name__ == "__main__":
     app.connect("destroy", Gtk.main_quit)
     app.show_all()
     Gtk.main()
+
+
+def is_ascii(s):
+    return s and all(ord(c) < 128 for c in s)
+
+
+def translate(hardware_keycode, state, group):
+    # We may need to retry several times to deal with garbled text.
+
+    keymap = Gdk.Keymap.get_default()
+
+    # distinct
+    it = list(set([group, 0, 1, 2]))
+
+    ok_to_return = False
+    keyval = None
+    keyval_lower = None
+
+    for g in it:
+        res = keymap.translate_keyboard_state(hardware_keycode, Gdk.ModifierType(0), g)
+
+        if not res:
+            # PyGTK returns None when gdk_keymap_translate_keyboard_state()
+            # returns false.  Not sure if this is a bug or a feature - the only
+            # time I have seen this happen is when I put my laptop into sleep
+            # mode.
+
+            continue
+
+        keyval = res[1]
+
+        # consumed_modifiers = res[4]
+
+        lbl = Gtk.accelerator_get_label(keyval, state)
+
+        if is_ascii(lbl):
+            ok_to_return = True
+            break
+
+    if not ok_to_return:
+        return None, None, None, None
+
+    # We want to ignore irrelevant modifiers like ScrollLock.  The stored
+    # key binding does not include modifiers that affected its keyval.
+    mods = Gdk.ModifierType(state & Gtk.accelerator_get_default_mod_mask())
+
+    keyval_lower = Gdk.keyval_to_lower(keyval)
+
+    # If lowercasing affects the keysym, then we need to include
+    # SHIFT in the modifiers. We re-upper case when we match against
+    # the keyval, but display and save in caseless form.
+    if keyval != keyval_lower:
+        mods |= Gdk.ModifierType.SHIFT_MASK
+
+    # So we get (<Shift>j, Shift+J) but just (plus, +). As I
+    # understand it.
+
+    accel_label = Gtk.accelerator_get_label(keyval_lower, mods)
+
+    return keyval, keyval_lower, accel_label, mods

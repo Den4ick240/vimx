@@ -43,7 +43,7 @@ def main():
     chidren = get_children()
     hints = get_hints(chidren)
 
-    #print(len(chidren))
+    # print(len(chidren))
 
     if len(chidren) == 0:
         return
@@ -70,7 +70,7 @@ def main():
     # )
 
     run(
-        f"xdotool mousemove {click.get('x')} {click.get('y')}; xdotool click {'3' if click.get('button') =="right" else '1'}",
+        f"xdotool mousemove {click.get('x')} {click.get('y')}; xdotool click {'3' if click.get('button') =='right' else '1'}",
         check=False,
         shell=True,
     )

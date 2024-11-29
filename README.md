@@ -1,3 +1,5 @@
+# THIS IS FORK, I JUST COPYPASTED SOME CODE FROM ANOTHER REPO TO MAKE THIS WORK FOR MY USECASE FEEL FREE TO WHATEVER
+
 Note: This is still very alpha quality software and currently only works on Linux X11, with little wayland support.
 
 ![demo](https://github.com/user-attachments/assets/cda0e568-a16c-4bc4-af20-7b3981cc213c)
